@@ -13,6 +13,39 @@ const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));render()};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // آدرس سایت به‌صورت لینک نمایش داده می‌شود تا با کلیک، در مرورگر باز شود
 const siteLink=u=>{let s=String(u??'').trim();if(!s||s==='ثبت نشده')return esc(s);let url=/^https?:\/\//.test(s)?s:'https://'+s;return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s)}</a>`};
+
+// اطلاعات فنی سایت برای ارائهٔ خدمات افزایش سرعت:
+// افزونه‌های نصب‌شده + معیارهای سرعت + مشکلات سایت به زبان ساده، زیر نام صاحب سایت.
+// این داده‌ها از خروجی JSON پنل منشی می‌آید (در شیء lead هر گزارش).
+const siteIntel=lead=>{
+  if(!lead||typeof lead!=='object')return'';
+  // خروجی جدید کارشناس leadSnapshot را هم دارد؛ ترکیب هر دو برای پایداری
+  let src={...(lead.leadSnapshot||{}),...lead};
+  let plugins=Array.isArray(src.plugins)?src.plugins.filter(Boolean):[];
+  let issues=Array.isArray(src.issues)?src.issues.filter(Boolean):[];
+  let s=src.speed;
+  if(!plugins.length&&!issues.length&&!s)return'';
+  let out='';
+  if(s&&s.score!=null){
+    // معیارهای اصلی در یک نگاه: نمره + LCP + FCP + TTFB
+    let bits=[`نمره ${fa(s.score)} از ۱۰۰ (${esc(s.grade||'نامشخص')})`];
+    // دقت تست: میانهٔ چند اجرا (مثل گوگل PageSpeed)
+    let runs=Number(s.runs)||1;
+    if(runs>1)bits.unshift(`میانهٔ ${fa(runs)} اجرا`);
+    [['lcp','بارگذار اصلی'],['fcp','اولین محتوا'],['ttfb','پاسخ سرور']].forEach(([k,lbl])=>{
+      if(s[k]!=null)bits.push(`${lbl}: ${fa(Math.round(s[k]))} میلی‌ثانیه`);
+    });
+    if(s.tbt!=null)bits.push(`قفل صفحه: ${fa(Math.round(s.tbt))} میلی‌ثانیه`);
+    out+=`<div class="line"><b>سرعت سایت:</b> ${bits.join(' • ')}</div>`;
+  }
+  if(plugins.length){
+    out+=`<div class="line"><b>افزونه‌های نصب‌شده:</b> ${plugins.map(p=>`<span class="chip">${esc(p)}</span>`).join('')}</div>`;
+  }
+  if(issues.length){
+    out+=`<div class="site-intel"><b>مشکلات سایت (به زبان ساده — برای ارائه به مشتری):</b><ul>${issues.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>`;
+  }
+  return out;
+};
 const date=v=>{let d=new Date(v);return Number.isNaN(d.getTime())?null:d};
 const key=r=>r.id||[r.leadId,r.followUp,r.createdAt,r.lead?.url].join('|');
 const type=r=>{let d=date(r.followUp);if(!d)return'bad';let x=d-Date.now();return x<0?'overdue':x<=86400000?'soon':'future'};
@@ -33,6 +66,7 @@ function render(){
     contracted.map(r=>`
       <article class="appointment reported">
         <h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>
+        ${siteIntel(r.lead)}
         <div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div>
         <div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div>
         <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
@@ -46,7 +80,7 @@ function render(){
   $('#noWebsiteCount').textContent=fa(db.noWebsite.length);
   if(filter==='nowebsite'){
     let nw=db.noWebsite.slice().sort((x,y)=>new Date(y.createdAt||0)-new Date(x.createdAt||0));
-    $('#appointments').innerHTML=nw.length?nw.map(r=>`<article class="appointment"><h3>${esc(r.lead?.ownerName||'نام صاحب سایت ثبت نشده')}</h3><span class="badge">سایت نداشتند</span><div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||'ثبت نشده')}</div><div class="line"><b>توضیحات تماس:</b> ${esc(r.notes||'')}</div><div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div><div class="line"><b>زمان ثبت گزارش:</b> ${fmt(r.createdAt)}</div></article>`).join(''):'<div class="result">هنوز لیدی با وضعیت «سایت نداشتند» ثبت نشده است.</div>';
+    $('#appointments').innerHTML=nw.length?nw.map(r=>`<article class="appointment"><h3>${esc(r.lead?.ownerName||'نام صاحب سایت ثبت نشده')}</h3><span class="badge">سایت نداشتند</span>${siteIntel(r.lead)}<div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||'ثبت نشده')}</div><div class="line"><b>توضیحات تماس:</b> ${esc(r.notes||'')}</div><div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div><div class="line"><b>زمان ثبت گزارش:</b> ${fmt(r.createdAt)}</div></article>`).join(''):'<div class="result">هنوز لیدی با وضعیت «سایت نداشتند» ثبت نشده است.</div>';
   }
   else{
 
@@ -62,10 +96,11 @@ function render(){
 
   $('#appointments').innerHTML=show.length?
     show.map(r=>`
-      <article class="appointment ${r.t}">
+      <article class="appointment ${r.t}" data-akey="${esc(key(r))}">
         <h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>
         <span class="badge">${r.t==='soon'?'تا ۲۴ ساعت آینده':r.t==='overdue'?'گذشته':'آینده'}</span>
-        <div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)} — ${ago(r.followUp)}</div>
+        ${siteIntel(r.lead)}
+        <div class="line time-line"><b>زمان قرار:</b> ${fmt(r.followUp)} — ${ago(r.followUp)}</div>
         <div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div>
         <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
         <div class="line"><b>توضیحات:</b> ${esc(r.notes||'')}</div>
@@ -77,8 +112,66 @@ function render(){
   }
 
   $('#result').textContent=db.lastImport
-    ?`${fa(db.lastImport.added)} قرار اضافه شد${db.lastImport.updated?`؛ ${fa(db.lastImport.updated)} قرار به‌روزرسانی شد`:''}؛ ${fa(db.lastImport.duplicates)} تکراری نادیده گرفته شد${db.lastImport.pruned?`؛ ${fa(db.lastImport.pruned)} قرار لغو‌شده از فهرست حذف شد`:''}.`
+    ?(db.lastImport.restored
+      ?`بازگردانی از خروجی کارشناس: ${fa(db.lastImport.added)} قرار جدید؛ ${fa(db.lastImport.updated)} قرار به‌روزرسانی شد${db.lastImport.duplicates?`؛ ${fa(db.lastImport.duplicates)} گزارش بدون تغییر بود`:''}.`
+      :`${fa(db.lastImport.added)} قرار اضافه شد${db.lastImport.updated?`؛ ${fa(db.lastImport.updated)} قرار به‌روزرسانی شد`:''}؛ ${fa(db.lastImport.duplicates)} تکراری نادیده گرفته شد${db.lastImport.pruned?`؛ ${fa(db.lastImport.pruned)} قرار لغو‌شده از فهرست حذف شد`:''}.`)
     :'';
+  lastSig=signature();
+}
+
+// امضای داده‌ها برای اینکه رندر دوره‌ای فقط وقتی چیزی واقعاً تغییر کرد
+// کل لیست را بازنویسی کند (در غیر این صورت فقط زمان‌ها در‌جا به‌روز می‌شوند
+// تا اسکرول و فیلتر کاربر به هم نخورد)
+let lastSig=null;
+function signature(){return JSON.stringify([db.appointments.length,db.reports.length,db.noWebsite.length,db.appointments.map(r=>key(r)+(reportFor(r)?':1':':0')).sort(),filter])}
+function refreshTimes(){
+  document.querySelectorAll('#appointments .appointment[data-akey]').forEach(el=>{
+    let r=db.appointments.find(x=>key(x)===el.dataset.akey);if(!r)return;
+    let t=el.querySelector('.time-line');if(!t)return;
+    t.innerHTML=`<b>زمان قرار:</b> ${fmt(r.followUp)} — ${ago(r.followUp)}`;
+  });
+}
+
+// بازگردانی خروجی پنل کارشناس در دستگاه دیگر: هر ردیف یک قرار کامل با
+// گزارش چسبیده است. قرارها به‌جای جایگزینی، ادغام می‌شوند تا سابقه حفظ شود.
+function restoreExpertBackup(arr,fname){
+  let added=0,updated=0,duplicates=0;
+  arr.forEach(row=>{
+    if(!row||!row.leadId)return;
+    let appt={leadId:row.leadId,followUp:row.followUp,contactName:row.contactName||'',
+      notes:row.notes||'',createdAt:row.createdAt||'',
+      scheduledFollowUp:!!row.scheduledFollowUp,lead:row.lead||row.leadSnapshot||null,
+      appointmentKey:row.appointmentKey||null};
+    let ex=db.appointments.find(x=>x.leadId===row.leadId);
+    let nk;
+    if(ex){
+      let ok=key(ex);
+      Object.assign(ex,appt);
+      nk=key(ex);
+      if(ok!==nk){
+        db.reports.forEach(x=>{if(x.appointmentKey===ok)x.appointmentKey=nk});
+        if(Array.isArray(db.dismissed))db.dismissed=db.dismissed.map(x=>x===ok?nk:x);
+        if(db.notified)Object.keys(db.notified).forEach(t=>{if(t==='gharar-'+ok){db.notified['gharar-'+nk]=db.notified[t];delete db.notified[t]}});
+      }
+      updated++;
+    }else{
+      if(!appt.appointmentKey)appt.appointmentKey=appt.leadId;
+      nk=key(appt);
+      db.appointments.push(appt);
+      added++;
+    }
+    // گزارش کارشناس را به کلید قرارِ جدید می‌چسبانیم
+    let rep=row.report;
+    if(rep&&rep.status&&rep.notes){
+      let rec={appointmentKey:nk,status:rep.status,notes:rep.notes,
+        at:rep.at||new Date().toISOString(),updatedAt:rep.updatedAt||''};
+      let i=db.reports.findIndex(x=>x.appointmentKey===nk);
+      if(i>=0){if(rec.status!==db.reports[i].status||rec.notes!==db.reports[i].notes)db.reports[i]=rec;else duplicates++}
+      else db.reports.push(rec);
+    }
+  });
+  db.lastImport={added,updated,duplicates,pruned:0,file:fname,restored:true};
+  save();
 }
 
 $('#jsonFile').addEventListener('change',async e=>{
@@ -87,6 +180,10 @@ $('#jsonFile').addEventListener('change',async e=>{
   try{
     let raw=JSON.parse(await f.text());
     let arr=Array.isArray(raw)?raw:(raw.reports||raw.data||raw.items||[]);
+    if(!Array.isArray(arr))throw Error('فرمت آرایه‌ای یا کلید reports/data/items لازم است');
+    // مسیر ۲: خروجی پنل کارشناس (هر ردیف یک قرار با report چسبیده)
+    if(arr.some(r=>r&&(r.report||r.appointmentKey&&!r.status))){restoreExpertBackup(arr,f.name);return}
+    // مسیر ۱: خروجی پنل منشی
     // فقط آخرین گزارش هر لید ملاک است؛ اگر آخرین وضعیت «قرار جلسه با کارشناس» نبود، قرارداد وارد نمی‌شود
     let latest=new Map();
     arr.forEach(r=>{if(!r||!r.leadId)return;let cur=latest.get(r.leadId);if(!cur||new Date(r.createdAt||0).getTime()>=new Date(cur.createdAt||0).getTime())latest.set(r.leadId,r)});
@@ -149,9 +246,32 @@ function download(n,d){
 function jdate(){let j=Jalali.fromDate(new Date());return Jalali.fa(Jalali.pad(j.jy))+'-'+Jalali.fa(Jalali.pad(j.jm))+'-'+Jalali.fa(Jalali.pad(j.jd))}
 
 $('#exportData').onclick=()=>download('پشتیبان-کامل-پنل-کارشناس-'+jdate()+'.json',db);
+// خروجی گزارش‌های کارشناس باید «خود-حاوی» باشد: هر ردیف یک قرار کامل است
+// با اطلاعات فنی سایت (افزونه‌ها، سرعت، مشکلات) و گزارش ثبت‌شدهٔ کارشناس.
+// این فایل در دستگاه دیگر قابل بازگردانی است (مسیر restoreExpertBackup).
 $('#exportReports').onclick=()=>{
-  if(!db.reports.length){alert('هنوز گزارشی ثبت نشده است.');return}
-  download('گزارش‌های-کارشناس-'+jdate()+'.json',db.reports);
+  if(!db.appointments.length){alert('هنوز قراری ثبت نشده است.');return}
+  let rows=db.appointments.map(a=>{
+    let rep=reportFor(a);
+    // کلید قرار دوباره محاسبه می‌شود تا در دستگاه مقصد یکتا بماند
+    let k=key(a);
+    return{
+      // --- فیلدهای قرار (برای بازگردانی در دستگاه دیگر) ---
+      leadId:a.leadId,
+      followUp:a.followUp,
+      contactName:a.contactName||'',
+      notes:a.notes||'',
+      createdAt:a.createdAt||'',
+      scheduledFollowUp:!!a.scheduledFollowUp,
+      // --- lead کامل: سرعت/افزونه‌ها/مشکلات برای ارائه به مشتری ---
+      lead:a.lead||null,
+      leadSnapshot:a.lead?{ownerName:a.lead.ownerName,name:a.lead.name,url:a.lead.url,phone:a.lead.phone,plugins:a.lead.plugins,pluginsFa:a.lead.pluginsFa,issues:a.lead.issues,wordpressFacts:a.lead.wordpressFacts,speed:a.lead.speed}:null,
+      // --- گزارش کارشناس (در صورت ثبت) ---
+      appointmentKey:k,
+      report:rep?{appointmentKey:k,status:rep.status,notes:rep.notes,at:rep.at,updatedAt:rep.updatedAt||''}:null
+    };
+  });
+  download('گزارش‌های-کارشناس-'+jdate()+'.json',rows);
 };
 $('#clearData').onclick=()=>{
   if(!confirm('اطلاعات پنل کارشناس پاک شود؟'))return;
@@ -174,7 +294,7 @@ document.addEventListener('click',e=>{
   editingKey=b.dataset.report;
   let r=db.appointments.find(x=>key(x)===editingKey);
   if(!r)return;
-  $('#reportCard').innerHTML=`<h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3><div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div><div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>`;
+  $('#reportCard').innerHTML=`<h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>${siteIntel(r.lead)}<div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div><div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>`;
   let old=reportFor(r);
   $('#reportStatus').value=old?old.status:'';
   $('#reportNotes').value=old?old.notes:'';
@@ -200,8 +320,9 @@ $('#reportForm').addEventListener('submit',e=>{
 });
 
 render();
-setInterval(render,60000);
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+// هر ۶۰ ثانیه: فقط اگر داده‌ها تغییر کرده باشند لیست بازنویسی می‌شود؛
+// در غیر این صورت صرفاً متن «مانده/گذشته» در‌جا به‌روز می‌شود
+setInterval(()=>{if(signature()!==lastSig)render();else refreshTimes()},60000);
 
 /* ===== یادآوری قرارها (نوتیفیکیشن) ===== */
 if(!db.notified||typeof db.notified!=='object')db.notified={};

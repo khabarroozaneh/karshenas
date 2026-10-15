@@ -1,0 +1,16 @@
+{
+  "name": "speedcheck",
+  "version": "1.0.0",
+  "description": "Local PageSpeed-Insights-like audit: Lighthouse without Google API",
+  "type": "commonjs",
+  "bin": {
+    "speedcheck": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "dependencies": {
+    "chrome-launcher": "^1.2.0",
+    "lighthouse": "^13.5.0"
+  }
+}

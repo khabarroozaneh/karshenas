@@ -8,9 +8,16 @@
 .
 ├── index.html              # صفحه فرود: لینک هر دو برنامه
 ├── .github/workflows/deploy.yml  # استقرار خودکار روی GitHub Pages
+├── RAVAND/                 # خط لوله تولید لید (تشخیص وردپرس + تست سرعت)
+│   └── PIPELINE/Run.bat    # خودکارسازی کل خط لوله + سرور محلی
 ├── wpjoo-lead-app/         # برنامه منشی: مدیریت لید، گزارش، تقویم پیگیری شمسی
 └── wpjoo-expert-app/       # برنامه کارشناس: مشاهده قرارها و ثبت گزارش جلسه
 ```
+
+## خط لوله تولید لید
+
+برای تبدیل بانک اکسل به فید پنل منشی، `RAVAND/PIPELINE/Run.bat` را اجرا کنید.
+راهنمای کامل در [RAVAND/PIPELINE/README.md](RAVAND/PIPELINE/README.md) آمده است.
 
 ## انتشار روی GitHub Pages
 

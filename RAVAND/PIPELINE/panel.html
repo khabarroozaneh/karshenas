@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#116466">
+<title>وردپرس جو | پنل خط لوله</title>
+<style>
+:root{--ink:#18202a;--brand:#116466;--brand2:#0d4d4f;--line:#d6e1e0;--ok:#e9f7ed;--warn:#fff3cd;--err:#ffe5e5}
+*{box-sizing:border-box}
+body{margin:0;background:#f7f9f9;color:var(--ink);font-family:Tahoma,"Segoe UI",sans-serif;line-height:1.8}
+header{background:var(--brand);color:#fff;padding:18px max(18px,calc((100% - 760px)/2));display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+h1,h2,p{margin:0 0 8px}
+main{max-width:760px;margin:auto;padding:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+.hero{background:#eef7f6;border-color:var(--line)}
+.hero h2{color:var(--brand)}
+button,select{border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:12px;padding:12px 16px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
+button.primary{background:var(--brand);color:#fff}
+button.primary:hover{background:var(--brand2)}
+button:disabled{opacity:.5;cursor:not-allowed}
+select{width:100%;padding:12px}
+label{display:block;font-weight:700;margin:10px 0 4px}
+.hint{font-size:12.5px;color:#657177;font-weight:400}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>button{flex:1;min-width:180px}
+.notice{background:var(--ok);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:14px}
+.notice.warn{background:var(--warn)}
+.notice.err{background:var(--err)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.stats>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.stats b{display:block;color:var(--brand);font-size:24px}
+.stats span{font-size:12px;color:#657177}
+pre.log{background:#18202a;color:#cfe8e6;border-radius:12px;padding:14px;max-height:340px;overflow:auto;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;direction:ltr;text-align:left}
+.spin{display:inline-block;width:14px;height:14px;border:2.5px solid #bcdad8;border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-left:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.banklist{display:grid;gap:8px;margin-top:8px}
+.bank{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;font-weight:400}
+.bank.sel{border-color:var(--brand);background:#eef7f6;font-weight:700}
+.bank .ico{font-size:20px}
+.bank .meta{margin-right:auto;font-size:12px;color:#657177}
+footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>وردپرس جو</h1><p>پنل خط لوله — انتخاب بانک و تولید فید</p></div>
+  <button onclick="location.href='http://127.0.0.1:8123/wpjoo-lead-app/'" style="background:#fff">پنل منشی ←</button>
+</header>
+<main>
+  <section class="card hero">
+    <h2>اجرای خط لوله</h2>
+    <p>ابتدا بانک اکسل را از فهرست زیر انتخاب کنید، سپس حالت اجرا را بزنید. برنامه خودسرانه سراغ بانک نمی‌رود.</p>
+  </section>
+
+  <section class="card">
+    <h2>۱) انتخاب بانک</h2>
+    <p class="hint">فایل‌های اکسل موجود در پوشهٔ <code>RAVAND/1/DATA</code>:</p>
+    <div id="bankList" class="banklist"><div class="hint">در حال بارگذاری فهرست بانک‌ها …</div></div>
+    <div id="bankNone" class="notice warn hidden">هیچ فایل اکسلی در پوشهٔ داده‌ها پیدا نشد. فایل بانک را در پوشهٔ <code>RAVAND/1/DATA</code> قرار دهید و دوباره تلاش کنید.</div>
+  </section>
+
+  <section class="card">
+    <h2>۲) حالت اجرا</h2>
+    <div class="row">
+      <button id="btnFull" class="primary" disabled>اجرای کامل<br><small class="hint">تشخیص وردپرس + تست سرعت</small></button>
+      <button id="btnCached" disabled>بازسازی فید از کش<br><small class="hint">سریع، بدون تست زنده</small></button>
+    </div>
+    <div id="runNote" class="notice hidden"></div>
+  </section>
+
+  <section class="card">
+    <h2>۳) پیشرفت اجرا</h2>
+    <div class="stats">
+      <div><b id="stFeed">—</b><span>لید در فید فعلی</span></div>
+      <div><b id="stState">آماده</b><span>وضعیت</span></div>
+      <div><b id="stBank">—</b><span>بانک انتخاب‌شده</span></div>
+    </div>
+    <pre id="log" class="log">خروجی خط لوله اینجا نمایش داده می‌شود …</pre>
+  </section>
+</main>
+<footer>آفلاین • فقط روی همین سیستم اجرا می‌شود</footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+let selectedBank=null, polling=null;
+
+async function api(p, opts){ const r=await fetch(p, Object.assign({headers:{'Cache-Control':'no-store'}}, opts||{})); return r; }
+
+function renderBanks(banks){
+  const box=$('#bankList');
+  if(!banks.length){ box.innerHTML=''; $('#bankNone').classList.remove('hidden'); return; }
+  $('#bankNone').classList.add('hidden');
+  box.innerHTML=banks.map(b=>`<div class="bank" data-path="${b.path}" title="${b.path}">
+    <span class="ico">📊</span><span>${b.name}</span>
+    <span class="meta">${Math.round(b.size/1024)} کیلوبایت</span></div>`).join('');
+  box.querySelectorAll('.bank').forEach(el=>{
+    el.onclick=()=>{
+      box.querySelectorAll('.bank').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      selectedBank=el.dataset.path;
+      $('#stBank').textContent=el.querySelector('span:nth-child(2)').textContent;
+      $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+      $('#runNote').className='notice hidden';
+    };
+  });
+}
+
+async function loadBanks(){
+  try{
+    const r=await api('/api/banks'); const d=await r.json();
+    renderBanks(d.banks||[]);
+  }catch(err){ $('#bankList').innerHTML='<div class="notice err">خطا در بارگذاری بانک‌ها: '+err.message+'</div>'; }
+}
+
+async function loadFeed(){
+  try{
+    const r=await api('/api/feed'); const d=await r.json();
+    $('#stFeed').textContent=d.exists? fa(d.count) : '—';
+  }catch(err){ $('#stFeed').textContent='!'; }
+}
+
+async function startRun(mode){
+  if(!selectedBank){ $('#runNote').className='notice err'; $('#runNote').textContent='ابتدا یک بانک انتخاب کنید.'; return; }
+  $('#btnFull').disabled=true; $('#btnCached').disabled=true;
+  $('#log').textContent='در حال شروع خط لوله …';
+  $('#stState').innerHTML='<span class="spin"></span> در حال اجرا';
+  try{
+    const r=await api('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bank:selectedBank, mode:mode})});
+    const d=await r.json();
+    if(!d.ok){
+      $('#runNote').className='notice err'; $('#runNote').textContent=d.error||'شروع ناموفق بود';
+      $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+      return;
+    }
+    $('#runNote').className='notice'; $('#runNote').textContent='خط لوله شروع شد. پیشرفت را زیر ببینید.';
+    startPolling();
+  }catch(err){
+    $('#runNote').className='notice err'; $('#runNote').textContent='خطا: '+err.message;
+    $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+  }
+}
+
+function startPolling(){
+  if(polling) return;
+  polling=setInterval(async()=>{
+    try{
+      const r=await api('/api/status'); const d=await r.json();
+      $('#log').textContent=d.lines.join('\n')||'(بدون خروجی)';
+      $('#log').scrollTop=1e6;
+      if(!d.running){
+        clearInterval(polling); polling=null;
+        const ok=d.exitCode===0;
+        $('#stState').textContent=ok?'تمام شد ✓':'خطا';
+        $('#stState').style.color=ok?'#116466':'#a63232';
+        $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+        $('#runNote').className='notice '+(ok?'':'err');
+        $('#runNote').textContent=ok
+          ?'✅ خط لوله تمام شد. فید پنل منشی به‌روز شد.'
+          :('❌ خط لوله با خطا تمام شد (کد '+fa(d.exitCode)+').');
+        loadFeed();
+      }
+    }catch(err){/* درخواست بعدی دوباره تلاش می‌کند */}
+  },1200);
+}
+
+$('#btnFull').onclick=()=>startRun('full');
+$('#btnCached').onclick=()=>startRun('cached');
+loadBanks(); loadFeed();
+</script>
+</body>
+</html>

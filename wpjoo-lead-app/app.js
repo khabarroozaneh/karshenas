@@ -1,4 +1,4 @@
-﻿const KEY='wpjoo.v1',VERSION='۱۴۰۵/۰۷/۱۷';const $=s=>document.querySelector(s);let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);let db=JSON.parse(localStorage.getItem(KEY)||'{"leads":[],"reports":[],"cursor":0,"draft":null,"duplicates":0}');
+﻿const KEY='wpjoo.v1',VERSION='۱۴۰۵/۰۷/۱۸';const $=s=>document.querySelector(s);let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);let db=JSON.parse(localStorage.getItem(KEY)||'{"leads":[],"reports":[],"cursor":0,"draft":null,"duplicates":0}');
 function save(){localStorage.setItem(KEY,JSON.stringify(db));refresh()}function norm(v=''){return v.toString().trim().toLowerCase().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/^tel:/,'').replace(/\/$/,'').replace(/[\s().-]/g,'')}function fingerprints(x){let u=norm(x.url||x.website||x.domain||x.link),p=norm(x.phone||x.mobile||x.tel),n=norm(x.name||x.title);return [...new Set([u&&'url:'+u,p&&'phone:'+p,n&&p&&'namephone:'+n+'|'+p].filter(Boolean))]}function key(x){return fingerprints(x)[0]||''}function pick(x,keys){for(const k of keys){let v=String(x[k]??'').trim();if(v)return v}return ''}function site(x){return x.url||x.website||x.domain||x.link||'بدون لینک'}function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 // آدرس سایت به‌صورت لینک نمایش داده می‌شود تا با کلیک، در مرورگر باز شود
 function siteLink(x){let s=site(x);if(!s||s==='بدون لینک')return esc(s);let u=/^https?:\/\//.test(s)?s:'https://'+s;return `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(s)}</a>`}
@@ -24,7 +24,51 @@ function updateScheduleFields(){let status=$('#status').value,needs=status==='ق
 function persistDraft(){let index=next();if(index<0)return;db.draft={leadId:db.leads[index].id,status:$('#status').value,notes:$('#notes').value,followUp:$('#followUp').value,contactName:$('#contactName').value,scheduledFollowUp:$('#scheduleFollowUp').checked};localStorage.setItem(KEY,JSON.stringify(db))}
 $('#status').addEventListener('change',updateScheduleFields);$('#scheduleFollowUp').addEventListener('change',updateScheduleFields);$('#reportForm').addEventListener('input',persistDraft);$('#reportForm').addEventListener('change',persistDraft);
 $('#reportForm').addEventListener('submit',event=>{event.preventDefault();let index=next();if(index<0)return;let lead=db.leads[index],status=$('#status').value,notes=$('#notes').value.trim(),followUp=$('#followUp').value,contactName=$('#contactName').value.trim(),isFinal=TERMINAL.includes(status),scheduledFollowUp=!isFinal&&$('#scheduleFollowUp').checked,stamp=new Date(followUp).getTime();if(!status||notes.length<3||!contactName){alert('همه فیلدهای ضروری باید تکمیل شوند.');return}if((status==='قرار جلسه با کارشناس'||scheduledFollowUp)&&(!followUp||!Number.isFinite(stamp))){$('#followUpText').classList.add('invalid');alert('تاریخ و ساعت را صریحاً وارد کنید.');return}if(scheduledFollowUp&&stamp<=Date.now()){alert('زمان تماس مجدد باید در آینده باشد.');return}if(!isFinal&&!scheduledFollowUp){persistDraft();$('#resumeHint').textContent='تماس نیمه‌تمام است؛ نتیجه نهایی یا پیگیری با تاریخ و ساعت معتبر ثبت کنید.';$('#resumeHint').classList.remove('hidden');return}db.reports.push({id:crypto.randomUUID(),leadId:lead.id,lead,status,notes,followUp,contactName,scheduledFollowUp,isFinal,createdAt:new Date().toISOString()});db.draft=null;db.cursor=index+1;save();event.target.reset();updateScheduleFields();go('home')});
-$('#jsonFile').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;let out=$('#importResult');try{let raw=JSON.parse(await f.text()),arr=Array.isArray(raw)?raw:(raw.leads||raw.data||raw.items||[]);if(!Array.isArray(arr))throw Error('فرمت آرایه‌ای یا کلید leads/data/items لازم است');let old=new Set(db.leads.flatMap(fingerprints)),added=0,dup=0,rejected=0;arr.forEach(x=>{if(!x||typeof x!=='object')return;if(!pick(x,['ownerName','owner'])||!pick(x,['name','title'])||!pick(x,['url','website','domain','link'])||!pick(x,['phone','mobile','tel'])){rejected++;return}let keys=fingerprints(x),duplicate=!keys.length||keys.some(k=>old.has(k));if(duplicate){dup++;return}keys.forEach(k=>old.add(k));db.leads.push({...x,id:crypto.randomUUID(),sourceFile:f.name,importedAt:new Date().toISOString()});added++});db.duplicates+=dup;save();out.style.background='#e9f7ed';out.textContent=`${fa(added)} لید اضافه شد؛ ${fa(dup)} مورد تکراری مهار شد؛ ${fa(rejected)} لید ناقص رد شد؛ داده‌های قبلی حفظ شدند.`}catch(err){out.style.background='#ffe7e7';out.textContent='خطا: '+err.message}});$('#loadSample').onclick=()=>$('#jsonPreview').textContent=JSON.stringify([{ownerName:'نام صاحب سایت',name:'نام کسب‌وکار',url:'https://example.com',phone:'09120000000'}],null,2);
+// وارد کردن لیست لید به بانک — هم از فایل و هم از فید خودکار خط لوله
+// داده‌های کامل هر لید (افزونه‌ها، سرعت، مشکلات) دست‌نخورده باقی می‌مانند
+// تا در خروجی گزارش به کارشناس منتقل شوند.
+function importLeads(arr,fname){
+  if(!Array.isArray(arr))throw Error('فرمت آرایه‌ای یا کلید leads/data/items لازم است');
+  let old=new Set(db.leads.flatMap(fingerprints)),added=0,dup=0,rejected=0;
+  arr.forEach(x=>{
+    if(!x||typeof x!=='object')return;
+    if(!pick(x,['ownerName','owner'])||!pick(x,['name','title'])||!pick(x,['url','website','domain','link'])||!pick(x,['phone','mobile','tel'])){rejected++;return}
+    let keys=fingerprints(x),duplicate=!keys.length||keys.some(k=>old.has(k));
+    if(duplicate){dup++;return}
+    keys.forEach(k=>old.add(k));
+    db.leads.push({...x,id:crypto.randomUUID(),sourceFile:fname,importedAt:new Date().toISOString()});
+    added++
+  });
+  db.duplicates+=dup;
+  save();
+  return{added,dup,rejected}
+}
+function showImportResult(out,res){out.style.background='#e9f7ed';out.textContent=`${fa(res.added)} لید اضافه شد؛ ${fa(res.dup)} مورد تکراری مهار شد؛ ${fa(res.rejected)} لید ناقص رد شد؛ داده‌های قبلی حفظ شدند.`}
+$('#jsonFile').addEventListener('change',async e=>{
+  let f=e.target.files[0];if(!f)return;let out=$('#importResult');
+  try{
+    let raw=JSON.parse(await f.text()),arr=Array.isArray(raw)?raw:(raw.leads||raw.data||raw.items||[]);
+    showImportResult(out,importLeads(arr,f.name))
+  }catch(err){out.style.background='#ffe7e7';out.textContent='خطا: '+err.message}
+});
+// مسیر فید خروجی خط لوله (نسبی به ریشهٔ پروژه که با http.server سرو می‌شود)
+const FEED_URLS=['../RAVAND/PIPELINE/OUTPUT/secretary_feed.json','./secretary_feed.json'];
+// بارگذاری خودکار جدیدترین فید تولیدشده توسط خط لوله — بدون انتخاب دستی فایل
+$('#loadFeed').onclick=async()=>{
+  let out=$('#importResult');
+  let btn=$('#loadFeed'),oldText=btn.textContent;
+  btn.disabled=true;btn.textContent='در حال دریافت فید تازه …';
+  try{
+    let raw=null,errs=[];
+    for(let u of FEED_URLS){
+      try{let r=await fetch(u,{cache:'no-store'});if(r.ok){raw=await r.json();break}}catch(err){errs.push(err.message)}
+    }
+    if(raw===null)throw Error('فید پیدا نشد. خط لوله را اجرا کنید یا فایل را دستی انتخاب کنید. '+errs.join(' | '));
+    let arr=Array.isArray(raw)?raw:(raw.leads||raw.data||raw.items||[]);
+    showImportResult(out,importLeads(arr,'خط‌لوله/secretary_feed.json'));
+  }catch(err){out.style.background='#ffe7e7';out.textContent='خطا: '+err.message}
+  finally{btn.disabled=false;btn.textContent=oldText}
+};$('#loadSample').onclick=()=>$('#jsonPreview').textContent=JSON.stringify([{ownerName:'نام صاحب سایت',name:'نام کسب‌وکار',url:'https://example.com',phone:'09120000000'}],null,2);
 function renderReports(){let b=$('#reportList');b.innerHTML=db.reports.length?db.reports.slice().reverse().map(r=>`<div class="report"><b>نام صاحب سایت:</b> ${esc(r.lead.ownerName||r.lead.owner||'بدون نام')}<br><b>سایت:</b> ${siteLink(r.lead)}<br><b>نتیجه تماس:</b> ${esc(r.status)}<br><b>توضیحات:</b> ${esc(r.notes)}<br><b>زمان جلسه/پیگیری:</b> ${esc(Jalali.storageText(r.followUp,'ثبت نشده'))}<br><b>زمان ثبت گزارش:</b> ${esc(Jalali.storageText(new Date(r.createdAt),'ثبت نشده'))}<br><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div>`).join(''):'<div class="notice">هنوز گزارشی ثبت نشده است.</div>'}
 function download(name,data){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 // نام فایل‌ها شمسی و قابل‌فهم است تا کاربر راحت‌تر آن‌ها را پیدا کند

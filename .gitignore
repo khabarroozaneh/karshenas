@@ -1,6 +1,20 @@
 # ابزار توسعه — نباید وارد ریپو شود
 .freebuff/
 
+# --- داده‌های حساس (تلفن/نام) — هرگز منتشر نشوند ---
+RAVAND/1/DATA/
+RAVAND/PIPELINE/OUTPUT/
+RAVAND/1/Robat/wp_results_*.json
+
+# --- خروجی‌ها و کش ---
+RAVAND/2/TEST_SORAT/results.csv
+RAVAND/2/TEST_SORAT/reports/
+
+# --- وابستگی‌ها و کش پایتون ---
+__pycache__/
+*.pyc
+node_modules/
+
 # سیستم‌عامل
 .DS_Store
 Thumbs.db
