@@ -279,6 +279,14 @@ $('#clearData').onclick=()=>{
   db={appointments:[],reports:[],noWebsite:[],notified:{},alarmed:{},dismissed:[],lastImport:null};
   save();
 };
+// پاک‌کردن فقط داده‌های ورودی (قرارهای بارگذاری‌شده از JSON منشی) — گزارش‌های کارشناس حفظ می‌شوند
+$('#clearInputs').onclick=()=>{
+  if(!confirm('فقط ورودی‌ها پاک شوند؟ قرارهای بارگذاری‌شده حذف می‌شوند ولی گزارش‌های خودتان حفظ می‌شود.'))return;
+  if(!confirm('تأیید نهایی: همه قرارهای ورودی برای همیشه حذف می‌شوند. مطمئن هستید؟'))return;
+  db.appointments=[];db.noWebsite=[];db.notified={};db.alarmed={};db.dismissed=[];db.lastImport=null;
+  save();
+  $('#result').textContent='ورودی‌ها پاک شد؛ گزارش‌های کارشناس حفظ شدند.';
+};
 
 document.querySelectorAll('.filter').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));
