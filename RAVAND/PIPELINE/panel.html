@@ -39,6 +39,10 @@ pre.log{background:#18202a;color:#cfe8e6;border-radius:12px;padding:14px;max-hei
 .bank.sel{border-color:var(--brand);background:#eef7f6;font-weight:700}
 .bank .ico{font-size:20px}
 .bank .meta{margin-right:auto;font-size:12px;color:#657177}
+.stage{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;font-weight:400;margin:8px 0}
+.stage.on{border-color:var(--brand);background:#eef7f6}
+.stage input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--brand);cursor:pointer;flex-shrink:0}
+.stage b{display:block;color:var(--brand)}
 footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size:12.5px}
 </style>
 </head>
@@ -61,16 +65,24 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size
   </section>
 
   <section class="card">
-    <h2>۲) حالت اجرا</h2>
+    <h2>۲) مراحل قابل اجرا</h2>
+    <p class="hint">هر مرحله را می‌خواهید فعال کنید، غیرفعالش کنید؛ خط لوله فقط تیک‌خورده‌ها را اجرا می‌کند. پیش‌فرض: همه روشن (رفتار کامل قبلی).</p>
+    <label class="stage" id="lblDetect"><input type="checkbox" id="stgDetect" checked><span><b>مرحله ۱ — تشخیص وردپرس</b><small class="hint">ربات تشخیص، سایت‌های وردپرسی را از روی بانک پیدا می‌کند.</small></span></label>
+    <label class="stage" id="lblSpeed"><input type="checkbox" id="stgSpeed" checked><span><b>مرحله ۲ — تست سرعت (Lighthouse)</b><small class="hint">در صورت غیرفعال‌بودن هیچ تست زنده‌ای اجرا نمی‌شود و فید از کش سرعت قبلی (در صورت وجود) استفاده می‌کند.</small></span></label>
+    <label class="stage" id="lblFeed"><input type="checkbox" id="stgFeed" checked><span><b>مرحله ۳ — ساخت فید منشی</b><small class="hint">خروجی secretary_feed.json برای پنل منشی؛ اگر غیرفعال باشد فایل فید قبلی دست‌نخورده می‌ماند.</small></span></label>
+  </section>
+
+  <section class="card">
+    <h2>۳) شروع اجرا</h2>
     <div class="row">
-      <button id="btnFull" class="primary" disabled>اجرای کامل<br><small class="hint">تشخیص وردپرس + تست سرعت</small></button>
-      <button id="btnCached" disabled>بازسازی فید از کش<br><small class="hint">سریع، بدون تست زنده</small></button>
+      <button id="btnFull" class="primary" disabled>شروع اجرا<br><small class="hint">طبق تیک‌های مراحل بالا</small></button>
+      <button id="btnCached" disabled>بازسازی فید از کش<br><small class="hint">نادیده‌گرفتن تیک‌ها، فقط از کش‌ها</small></button>
     </div>
     <div id="runNote" class="notice hidden"></div>
   </section>
 
   <section class="card">
-    <h2>۳) پیشرفت اجرا</h2>
+    <h2>۴) پیشرفت اجرا</h2>
     <div class="stats">
       <div><b id="stFeed">—</b><span>لید در فید فعلی</span></div>
       <div><b id="stState">آماده</b><span>وضعیت</span></div>
@@ -85,6 +97,14 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size
 const $=s=>document.querySelector(s);
 const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let selectedBank=null, polling=null;
+const STAGE_FA={detect:'تشخیص وردپرس',speed:'تست سرعت',feed:'ساخت فید'};
+const STAGE_PAIRS=[['#stgDetect','#lblDetect'],['#stgSpeed','#lblSpeed'],['#stgFeed','#lblFeed']];
+
+function selectedStages(){const s=[];if($('#stgDetect').checked)s.push('detect');if($('#stgSpeed').checked)s.push('speed');if($('#stgFeed').checked)s.push('feed');return s;}
+function syncStages(){STAGE_PAIRS.forEach(([c,l])=>$(l).classList.toggle('on',$(c).checked));}
+function setStagesDisabled(v){STAGE_PAIRS.forEach(([c])=>$(c).disabled=v);}
+STAGE_PAIRS.forEach(([c])=>$(c).addEventListener('change',()=>{syncStages();$('#runNote').className='notice hidden';}));
+syncStages();
 
 async function api(p, opts){ const r=await fetch(p, Object.assign({headers:{'Cache-Control':'no-store'}}, opts||{})); return r; }
 
@@ -123,23 +143,28 @@ async function loadFeed(){
 
 async function startRun(mode){
   if(!selectedBank){ $('#runNote').className='notice err'; $('#runNote').textContent='ابتدا یک بانک انتخاب کنید.'; return; }
-  $('#btnFull').disabled=true; $('#btnCached').disabled=true;
+  const stages=selectedStages();
+  if(mode==='full' && !stages.length){ $('#runNote').className='notice err'; $('#runNote').textContent='حداقل یک مرحله را فعال کنید.'; return; }
+  $('#btnFull').disabled=true; $('#btnCached').disabled=true; setStagesDisabled(true);
   $('#log').textContent='در حال شروع خط لوله …';
   $('#stState').innerHTML='<span class="spin"></span> در حال اجرا';
   try{
     const r=await api('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({bank:selectedBank, mode:mode})});
+      body:JSON.stringify({bank:selectedBank, mode:mode, stages:stages})});
     const d=await r.json();
     if(!d.ok){
       $('#runNote').className='notice err'; $('#runNote').textContent=d.error||'شروع ناموفق بود';
-      $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+      $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false; setStagesDisabled(false);
       return;
     }
-    $('#runNote').className='notice'; $('#runNote').textContent='خط لوله شروع شد. پیشرفت را زیر ببینید.';
+    $('#runNote').className='notice';
+    $('#runNote').textContent=mode==='full'
+      ? 'شروع با مراحل: '+stages.map(s=>STAGE_FA[s]).join('، ')+'.'
+      : 'شروع: بازسازی فید از کش (نادیده‌گرفتن تیک‌ها).';
     startPolling();
   }catch(err){
     $('#runNote').className='notice err'; $('#runNote').textContent='خطا: '+err.message;
-    $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+    $('#stState').textContent='خطا'; $('#btnFull').disabled=false; $('#btnCached').disabled=false; setStagesDisabled(false);
   }
 }
 
@@ -155,7 +180,7 @@ function startPolling(){
         const ok=d.exitCode===0;
         $('#stState').textContent=ok?'تمام شد ✓':'خطا';
         $('#stState').style.color=ok?'#116466':'#a63232';
-        $('#btnFull').disabled=false; $('#btnCached').disabled=false;
+        $('#btnFull').disabled=false; $('#btnCached').disabled=false; setStagesDisabled(false);
         $('#runNote').className='notice '+(ok?'':'err');
         $('#runNote').textContent=ok
           ?'✅ خط لوله تمام شد. فید پنل منشی به‌روز شد.'

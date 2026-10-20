@@ -28,12 +28,19 @@ FEED_PATH = os.path.join(OUTPUT_DIR, "secretary_feed.json")
 PORT = int(os.environ.get("WPJOO_PANEL_PORT", "8124"))
 MAX_LINES = 400
 
+# مراحل قابل فعال/غیرفعال در پنل و نام فارسی هر کدام
+VALID_STAGES = ("detect", "speed", "feed")
+STAGE_FA = {"detect": "تشخیص وردپرس",
+            "speed": "تست سرعت",
+            "feed": "ساخت فید"}
+
 _lock = threading.Lock()
 _job = {
     "running": False,          # آیا خط لوله در حال اجراست
     "pid": None,               # شناسهٔ پروسه
     "bank": None,              # بانک انتخاب‌شده
     "mode": None,              # full | cached
+    "stages": None,            # مراحل انتخابی در حالت full
     "lines": [],               # لاگ‌های زنده
     "startedAt": None,
     "finishedAt": None,
@@ -82,11 +89,16 @@ def feed_summary():
         return {"exists": True, "count": 0, "error": str(err)}
 
 
-def run_pipeline(bank_path, mode):
-    """اجرای pipeline.py در یک نخ جداگانه و جمع‌آوری لاگ‌ها."""
+def run_pipeline(bank_path, mode, stages=None):
+    """اجرای pipeline.py در یک نخ جداگانه و جمع‌آوری لاگ‌ها.
+
+    stages: لیست مراحل انتخابی در پنل (detect / speed / feed)؛ فقط در حالت full.
+    """
+    stages = list(stages or VALID_STAGES)
     with _lock:
         _job.update({
             "running": True, "pid": None, "bank": bank_path, "mode": mode,
+            "stages": stages if mode == "full" else None,
             "lines": [], "startedAt": datetime.now().isoformat(),
             "finishedAt": None, "exitCode": None,
         })
@@ -95,9 +107,13 @@ def run_pipeline(bank_path, mode):
            "--bank", bank_path]
     if mode == "cached":
         cmd.append("--cached-only")
+        desc = "بازسازی فید از کش"
+    else:
+        cmd += ["--stages", ",".join(stages)]
+        desc = ("مراحل: " +
+                "، ".join(STAGE_FA[s] for s in VALID_STAGES if s in stages))
 
-    log(f"⚡ شروع خط لوله | بانک: {os.path.basename(bank_path)} | حالت: "
-        f"{'بازسازی فید از کش' if mode == 'cached' else 'اجرای کامل'}")
+    log(f"⚡ شروع خط لوله | بانک: {os.path.basename(bank_path)} | {desc}")
 
     try:
         # text=true با encoding utf-8 تا خروجی فارسی/اموجی در ویندوز سالم بماند
@@ -152,6 +168,7 @@ class Handler(BaseHTTPRequestHandler):
                     "running": _job["running"],
                     "bank": _job["bank"],
                     "mode": _job["mode"],
+                    "stages": _job["stages"],
                     "startedAt": _job["startedAt"],
                     "finishedAt": _job["finishedAt"],
                     "exitCode": _job["exitCode"],
@@ -186,6 +203,20 @@ class Handler(BaseHTTPRequestHandler):
         bank = str(payload.get("bank") or "").strip()
         mode = "cached" if str(payload.get("mode") or "full") == "cached" else "full"
 
+        # مراحل انتخابی از چک‌باکس‌های پنل (فقط در حالت اجرای سفارشی)
+        stages = []
+        if mode == "full":
+            raw = payload.get("stages")
+            if raw is None:
+                stages = list(VALID_STAGES)
+            elif isinstance(raw, list):
+                stages = [str(s).strip().lower() for s in raw if str(s).strip()]
+            if not stages or any(s not in VALID_STAGES for s in stages):
+                self._json({"ok": False,
+                            "error": "مقدار مراحل انتخابی نامعتبر است "
+                                     "(مقادیر مجاز: detect, speed, feed)"}, 400)
+                return
+
         # بانک باید یکی از فایل‌های موجود در پوشهٔ داده‌ها باشد
         # مسیرها قبل از مقایسه نرمالایز می‌شوند تا تفاوت / و \\ مشکل نسازد
         banks = {os.path.normpath(b["path"]) for b in find_banks()}
@@ -194,9 +225,9 @@ class Handler(BaseHTTPRequestHandler):
                         "error": "بانک انتخاب‌شده در فهرست فایل‌های موجود نیست"}, 400)
             return
 
-        threading.Thread(target=run_pipeline, args=(bank, mode),
+        threading.Thread(target=run_pipeline, args=(bank, mode, stages),
                          daemon=True).start()
-        self._json({"ok": True, "bank": bank, "mode": mode})
+        self._json({"ok": True, "bank": bank, "mode": mode, "stages": stages})
 
     def log_message(self, *args):
         # لاول‌های پیش‌فرض سرور را آراتس نمی‌کنیم

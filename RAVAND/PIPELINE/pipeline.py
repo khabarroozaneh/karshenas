@@ -555,7 +555,12 @@ def main():
         help="فقط N ردیف اول (۰ = همه)")
     parser.add_argument(
         "--skip-speed", action="store_true",
-        help="مرحلهٔ ۲ (تست سرعت) را انجام نده")
+        help="مرحلهٔ ۲ (تست سرعت) را انجام نده (معادل حذف speed از --stages)")
+    parser.add_argument(
+        "--stages", default="detect,speed,feed",
+        help="مراحل قابل اجرا با کاما: detect=تشخیص وردپرس، "
+             "speed=تست سرعت، feed=ساخت فید منشی "
+             "(مثال: --stages detect,feed)")
     parser.add_argument(
         "--no-cache", action="store_true",
         help="کش Lighthouse را نادیده بگیر و همه را دوباره تست کن")
@@ -573,6 +578,23 @@ def main():
         help="مسیر فایل خروجی (پیش‌فرض: OUTPUT/secretary_feed.json)")
     args = parser.parse_args()
 
+    # --- مراحل انتخابی (قابل فعال/غیرفعال از پنل خط لوله) ---
+    VALID_STAGES = ("detect", "speed", "feed")
+    stages = [s.strip().lower() for s in args.stages.split(",") if s.strip()]
+    unknown = [s for s in stages if s not in VALID_STAGES]
+    if not stages or unknown:
+        log("❌ --stages نامعتبر: " +
+            ("، ".join(unknown) if unknown else "(خالی)") +
+            " | مقادیر مجاز: detect, speed, feed")
+        sys.exit(2)
+    stages = set(stages)
+    run_detect = "detect" in stages
+    run_speed = "speed" in stages and not args.skip_speed
+    run_feed = "feed" in stages
+    log("مراحل انتخابی: تشخیص " + ("✓" if run_detect else "✗") +
+        " | سرعت " + ("✓" if run_speed else "✗") +
+        " | ساخت فید " + ("✓" if run_feed else "✗"))
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # --- خواندن بانک ---
@@ -585,8 +607,8 @@ def main():
     log(f"بانک خوانده شد: {len(leads)} ردیف")
 
     # --- مرحله ۱ ---
-    if args.cached_only:
-        # بازسازی سریع فید از نتایج ذخیره‌شدهٔ اجرای قبلی
+    if args.cached_only or not run_detect:
+        # نتایج تشخیص از اجرای قبلی خوانده می‌شود؛ ربات اجرا نمی‌شود
         wp_by_url = load_stage1_cache()
         cache = load_speed_cache()
         # هر سایتی که در کش سرعت هست، قبلاً به‌عنوان وردپرس تأیید شده است
@@ -595,7 +617,14 @@ def main():
                 wp_by_url[key] = {"url": key, "technologies": {}}
         results = {"wordpress": list(wp_by_url.values()),
                    "not_wordpress": [], "blocked": [], "errors": []}
-        log(f"مرحله ۱ از کش: {len(wp_by_url)} وردپرسی")
+        if args.cached_only:
+            log(f"مرحله ۱ از کش: {len(wp_by_url)} وردپرسی")
+        else:
+            log(f"مرحله ۱ غیرفعال — از کش تشخیص استفاده شد: "
+                f"{len(wp_by_url)} وردپرسی")
+            if not wp_by_url:
+                log("⚠️ کش تشخیص خالی است؛ فید خالی می‌شود. "
+                    "برای اولین اجرا، مرحلهٔ تشخیص را فعال کنید.")
     else:
         results, wp_by_url = run_stage1(leads, max_workers=args.workers)
 
@@ -608,8 +637,13 @@ def main():
                         if isinstance(v, dict)}
         log(f"مرحله ۲ از کش: {sum(1 for v in speed_by_url.values() if v.get('ok'))} "
             f"نتیجهٔ تست سرعت")
-    elif args.skip_speed:
-        log("مرحله ۲ با پرچم --skip-speed رد شد")
+    elif not run_speed:
+        # تست زنده انجام نمی‌شود؛ اگر کش سرعتی از قبل هست، در فید استفاده می‌شود
+        speed_by_url = {k: v for k, v in load_speed_cache().items()
+                        if isinstance(v, dict)}
+        log(f"مرحله ۲ غیرفعال — بدون تست زنده؛ "
+            f"{sum(1 for v in speed_by_url.values() if v.get('ok'))} "
+            f"نتیجهٔ قبلی از کش سرعت در فید استفاده می‌شود")
     elif not wp_leads:
         log("مرحله ۲ رد شد: هیچ سایت وردپرسی‌ای پیدا نشد")
     else:
@@ -635,20 +669,26 @@ def main():
             f"({cached_hits} از کش)")
 
     # --- ساخت فید ---
-    feed, skipped = build_feed(leads, wp_by_url, speed_by_url,
-                               run_stage2_flag=not args.skip_speed or args.cached_only)
-    log(f"فید ساخته شد: {len(feed)} لید وردپرسی، {len(skipped)} رد شده")
+    # دادهٔ سرعت (زنده یا از کش) همیشه در فید قرار می‌گیرد؛ اگر مرحلهٔ
+    # سرعت خاموش باشد و کشی هم نباشد، فیلد speed به‌صورت null ساخته می‌شود.
+    feed, skipped = [], []
+    if run_feed:
+        feed, skipped = build_feed(leads, wp_by_url, speed_by_url,
+                                   run_stage2_flag=True)
+        log(f"فید ساخته شد: {len(feed)} لید وردپرسی، {len(skipped)} رد شده")
 
-    # --- نوشتن خروجی‌ها ---
-    out = args.output or os.path.join(OUTPUT_DIR, "secretary_feed.json")
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(feed, f, ensure_ascii=False, indent=2)
-    log(f"✅ خوراک پنل منشی: {out}")
+        # --- نوشتن خروجی‌ها ---
+        out = args.output or os.path.join(OUTPUT_DIR, "secretary_feed.json")
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump(feed, f, ensure_ascii=False, indent=2)
+        log(f"✅ خوراک پنل منشی: {out}")
+    else:
+        log("مرحلهٔ ساخت فید غیرفعال — فایل فید تغییری نکرد")
 
     detail = os.path.join(OUTPUT_DIR, "pipeline_report.json")
-    # در حالت --cached-only گزارش کامل قبلی حفظ می‌شود تا داده‌های واقعی
-    # مرحله ۱ از بین نرود؛ فقط فید بازسازی می‌شود
-    if not args.cached_only:
+    # در حالت --cached-only یا وقتی تشخیص غیرفعال است، گزارش کامل قبلی حفظ
+    # می‌شود تا داده‌های واقعی مرحله ۱ از بین نرود؛ فقط فید بازسازی می‌شود
+    if not args.cached_only and run_detect:
         with open(detail, "w", encoding="utf-8") as f:
             json.dump({
                 "runAt": datetime.now().isoformat(),
@@ -658,7 +698,7 @@ def main():
                 "notWordpress": len(results["not_wordpress"]),
                 "blocked": len(results.get("blocked", [])),
                 "errors": len(results["errors"]),
-                "feedSize": len(feed),
+                "feedSize": len(feed) if run_feed else None,
                 "skipped": skipped,
                 "stage1": {
                     "wordpress": results["wordpress"],
