@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-خط لوله تولید لید وردپرسی — از بانک اکسل تا خوراک پنل منشی
+خط لوله تولید لید وردپرسی — از بانک اکسل تا پنل کارشناس
 ================================================================
 مرحله ۱: تشخیص سایت‌های وردپرسی (RAVAND/1/Robat/detector.py)
 مرحله ۲: تست سرعت فقط وردپرسی‌های تأییدشده (RAVAND/2/TEST_SORAT/cli.js)
-خروجی : فید JSON پنل منشی با افزونه‌ها + معیارهای سرعت + مشکلات به زبان ساده
+خروجی : فید JSON پنل کارشناس با افزونه‌ها + معیارهای سرعت + مشکلات به زبان ساده
 
 ساختار اکسل بانک (فایل نمونه: RAVAND/1/DATA/1-235.xlsx):
     ستون A = نام سایت / کسب‌وکار   -> name
@@ -31,7 +31,7 @@ OUTPUT_DIR = os.path.join(BASE, "OUTPUT")
 sys.path.insert(0, os.path.abspath(ROBOT_DIR))
 from detector import WordPressDetector  # noqa: E402
 
-# فیلدهای اجباری پنل منشی — بدون هر چهار فیلد، لید رد می‌شود
+# فیلدهای اجباری پنل کارشناس — بدون هر چهار فیلد، لید رد می‌شود
 REQUIRED_KEYS = {
     "ownerName": ("ownerName", "owner"),
     "name": ("name", "title"),
@@ -472,7 +472,7 @@ def build_issues(speed, plugins):
 
 # ------------------------------------------------- ساخت فید ----
 def build_feed(leads, wp_by_url, speed_by_url, run_stage2_flag):
-    """خوراک نهایی پنل منشی را می‌سازد.
+    """خوراک نهایی پنل کارشناس را می‌سازد.
 
     هر لید شامل:
       - چهار فیلد اجباری (ownerName / name / url / phone)
@@ -498,12 +498,12 @@ def build_feed(leads, wp_by_url, speed_by_url, run_stage2_flag):
         issues = build_issues(speed, plugins)
 
         item = {
-            # --- فیلدهای اجباری پنل منشی ---
+            # --- فیلدهای اجباری پنل کارشناس ---
             "ownerName": lead["ownerName"] or lead["name"],
             "name": lead["name"],
             "url": lead["url"],
             "phone": lead["phone"],
-            # --- داده‌های پنل کارشناس (منشی استفاده نمی‌کند) ---
+            # --- داده‌های فنی برای کارت لید (سرعت/افزونه‌ها/مشکلات) ---
             "plugins": plugins,
             "pluginsFa": plugins_fa,
             "issues": issues,
@@ -559,7 +559,7 @@ def main():
     parser.add_argument(
         "--stages", default="detect,speed,feed",
         help="مراحل قابل اجرا با کاما: detect=تشخیص وردپرس، "
-             "speed=تست سرعت، feed=ساخت فید منشی "
+             "speed=تست سرعت، feed=ساخت فید کارشناس "
              "(مثال: --stages detect,feed)")
     parser.add_argument(
         "--no-cache", action="store_true",
@@ -681,7 +681,7 @@ def main():
         out = args.output or os.path.join(OUTPUT_DIR, "secretary_feed.json")
         with open(out, "w", encoding="utf-8") as f:
             json.dump(feed, f, ensure_ascii=False, indent=2)
-        log(f"✅ خوراک پنل منشی: {out}")
+        log(f"✅ خوراک پنل کارشناس: {out}")
     else:
         log("مرحلهٔ ساخت فید غیرفعال — فایل فید تغییری نکرد")
 

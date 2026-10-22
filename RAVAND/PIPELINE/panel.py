@@ -73,7 +73,7 @@ def find_banks():
 
 
 def feed_summary():
-    """خلاصهٔ فید فعلی پنل منشی."""
+    """خلاصهٔ فید فعلی پنل کارشناس."""
     if not os.path.exists(FEED_PATH):
         return {"exists": False, "count": 0}
     try:

@@ -49,7 +49,7 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size
 <body>
 <header>
   <div><h1>وردپرس جو</h1><p>پنل خط لوله — انتخاب بانک و تولید فید</p></div>
-  <button onclick="location.href='http://127.0.0.1:8123/wpjoo-lead-app/'" style="background:#fff">پنل منشی ←</button>
+  <button onclick="location.href='http://127.0.0.1:8123/wpjoo-expert-app/'" style="background:#fff">پنل کارشناس ←</button>
 </header>
 <main>
   <section class="card hero">
@@ -69,7 +69,7 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size
     <p class="hint">هر مرحله را می‌خواهید فعال کنید، غیرفعالش کنید؛ خط لوله فقط تیک‌خورده‌ها را اجرا می‌کند. پیش‌فرض: همه روشن (رفتار کامل قبلی).</p>
     <label class="stage" id="lblDetect"><input type="checkbox" id="stgDetect" checked><span><b>مرحله ۱ — تشخیص وردپرس</b><small class="hint">ربات تشخیص، سایت‌های وردپرسی را از روی بانک پیدا می‌کند.</small></span></label>
     <label class="stage" id="lblSpeed"><input type="checkbox" id="stgSpeed" checked><span><b>مرحله ۲ — تست سرعت (Lighthouse)</b><small class="hint">در صورت غیرفعال‌بودن هیچ تست زنده‌ای اجرا نمی‌شود و فید از کش سرعت قبلی (در صورت وجود) استفاده می‌کند.</small></span></label>
-    <label class="stage" id="lblFeed"><input type="checkbox" id="stgFeed" checked><span><b>مرحله ۳ — ساخت فید منشی</b><small class="hint">خروجی secretary_feed.json برای پنل منشی؛ اگر غیرفعال باشد فایل فید قبلی دست‌نخورده می‌ماند.</small></span></label>
+    <label class="stage" id="lblFeed"><input type="checkbox" id="stgFeed" checked><span><b>مرحله ۳ — ساخت فید کارشناس</b><small class="hint">خروجی secretary_feed.json برای پنل کارشناس؛ اگر غیرفعال باشد فایل فید قبلی دست‌نخورده می‌ماند.</small></span></label>
   </section>
 
   <section class="card">
@@ -183,7 +183,7 @@ function startPolling(){
         $('#btnFull').disabled=false; $('#btnCached').disabled=false; setStagesDisabled(false);
         $('#runNote').className='notice '+(ok?'':'err');
         $('#runNote').textContent=ok
-          ?'✅ خط لوله تمام شد. فید پنل منشی به‌روز شد.'
+          ?'✅ خط لوله تمام شد. فید پنل کارشناس به‌روز شد.'
           :('❌ خط لوله با خطا تمام شد (کد '+fa(d.exitCode)+').');
         loadFeed();
       }
