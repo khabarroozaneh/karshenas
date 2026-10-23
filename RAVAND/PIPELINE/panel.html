@@ -18,6 +18,8 @@ main{max-width:760px;margin:auto;padding:18px}
 button,select{border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:12px;padding:12px 16px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
 button.primary{background:var(--brand);color:#fff}
 button.primary:hover{background:var(--brand2)}
+.expert-link{display:inline-block;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:12px;padding:12px 16px;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer}
+.expert-link:hover{background:var(--brand);color:#fff}
 button:disabled{opacity:.5;cursor:not-allowed}
 select{width:100%;padding:12px}
 label{display:block;font-weight:700;margin:10px 0 4px}
@@ -27,6 +29,7 @@ label{display:block;font-weight:700;margin:10px 0 4px}
 .notice{background:var(--ok);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:14px}
 .notice.warn{background:var(--warn)}
 .notice.err{background:var(--err)}
+.hidden{display:none!important}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
 .stats>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
 .stats b{display:block;color:var(--brand);font-size:24px}
@@ -49,7 +52,7 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 18px;color:#657177;font-size
 <body>
 <header>
   <div><h1>وردپرس جو</h1><p>پنل خط لوله — انتخاب بانک و تولید فید</p></div>
-  <button onclick="location.href='http://127.0.0.1:8123/wpjoo-expert-app/'" style="background:#fff">پنل کارشناس ←</button>
+  <a class="expert-link" href="./wpjoo-expert-app/" target="_blank" rel="noopener">پنل کارشناس ←</a>
 </header>
 <main>
   <section class="card hero">

@@ -2,11 +2,16 @@
 """
 پنل کاربرپسند خط لوله — انتخاب بانک از داخل پنل، نه از خط فرمان
 ================================================================
-- GET /            -> صفحهٔ پنل (panel.html)
-- GET /api/banks   -> فهرست فایل‌های اکسل موجود در RAVAND/1/DATA
-- POST /api/run    -> اجرای خط لوله روی بانک انتخاب‌شده (در پس‌زمینه)
-- GET /api/status  -> وضعیت اجرا + لاگ‌های زنده
-- GET /api/feed    -> خلاصهٔ فید ساخته‌شده
+- GET  /                    -> صفحهٔ پنل (panel.html)
+- GET  /wpjoo-expert-app/   -> پنل کارشناس (فایل‌های واقعی پوشه، بدون کپی)
+- GET  /RAVAND/PIPELINE/OUTPUT/secretary_feed.json
+                            -> فید تازه برای «بارگذاری خودکار فید» پنل کارشناس
+- GET  /api/banks           -> فهرست فایل‌های اکسل موجود در RAVAND/1/DATA
+- POST /api/run             -> اجرای خط لوله روی بانک انتخاب‌شده (در پس‌زمینه)
+- GET  /api/status          -> وضعیت اجرا + لاگ‌های زنده
+- GET  /api/feed            -> خلاصهٔ فید ساخته‌شده
+
+همه چیز روی یک پورت است تا دکمهٔ «پنل کارشناس» همیشه کار کند.
 
 اجرا:  python panel.py   ->  http://127.0.0.1:8124/
 """
@@ -16,14 +21,17 @@ import os
 import subprocess
 import sys
 import threading
+import urllib.parse
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(BASE))       # ریشهٔ پروژه
 DATA_DIR = os.path.join(BASE, "..", "1", "DATA")
 OUTPUT_DIR = os.path.join(BASE, "OUTPUT")
 PANEL_HTML = os.path.join(BASE, "panel.html")
+EXPERT_DIR = os.path.join(ROOT, "wpjoo-expert-app")
 FEED_PATH = os.path.join(OUTPUT_DIR, "secretary_feed.json")
 PORT = int(os.environ.get("WPJOO_PANEL_PORT", "8124"))
 MAX_LINES = 400
@@ -33,6 +41,25 @@ VALID_STAGES = ("detect", "speed", "feed")
 STAGE_FA = {"detect": "تشخیص وردپرس",
             "speed": "تست سرعت",
             "feed": "ساخت فید"}
+
+# پسوند فایل -> نوع محتوا (فقط چیزی که واقعاً لازم داریم)
+MIME = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".mjs": "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".txt": "text/plain; charset=utf-8",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+}
 
 _lock = threading.Lock()
 _job = {
@@ -89,6 +116,48 @@ def feed_summary():
         return {"exists": True, "count": 0, "error": str(err)}
 
 
+def safe_join(root, parts):
+    """اتصال امن مسیر به پوشهٔ ریشه؛ از پوشهٔ ریشه بالاتر نمی‌رود و فایل باید موجود باشد."""
+    target = os.path.abspath(os.path.join(root, *parts))
+    root_abs = os.path.abspath(root)
+    if not (target == root_abs or target.startswith(root_abs + os.sep)):
+        return None
+    if os.path.isdir(target):
+        target = os.path.join(target, "index.html")
+    if not os.path.isfile(target):
+        return None
+    return target
+
+
+def resolve_file(url_path):
+    """مسیر URL را به یک فایل مجاز تبدیل می‌کند؛ مسیر نامعتبر یا خارج از دامنه → None.
+
+    دو چیز سرو می‌شود:
+      ۱) پوشهٔ wpjoo-expert-app  → تا دکمهٔ «پنل کارشناس» روی همین پورت کار کند
+      ۲) خروجی فید خط لوله      → تا «بارگذاری خودکار فید تازه» کار کند
+    """
+    path = urllib.parse.unquote(url_path).replace("\\", "/")
+    if "\x00" in path:
+        return None
+    parts = [s for s in path.split("/") if s not in ("", ".")]
+    if not parts or any(s == ".." for s in parts):
+        return None
+
+    # ۱) پنل کارشناس
+    if parts[0] == "wpjoo-expert-app":
+        return safe_join(EXPERT_DIR, parts[1:] or ["index.html"])
+
+    # ۲) فید خط لوله (مسیری که خود پنل کارشناس fetch می‌کند)
+    if parts[:3] == ["RAVAND", "PIPELINE", "OUTPUT"]:
+        return safe_join(OUTPUT_DIR, parts[3:])
+
+    # ۳) فید کنار خود پنل کارشناس (گزینهٔ دوم FEED_URLS در app.js)
+    if parts[:2] == ["wpjoo-expert-app", "secretary_feed.json"]:
+        return FEED_PATH if os.path.isfile(FEED_PATH) else None
+
+    return None
+
+
 def run_pipeline(bank_path, mode, stages=None):
     """اجرای pipeline.py در یک نخ جداگانه و جمع‌آوری لاگ‌ها.
 
@@ -140,29 +209,42 @@ def run_pipeline(bank_path, mode, stages=None):
 
 
 class Handler(BaseHTTPRequestHandler):
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+    def _send(self, code, body, ctype="application/json; charset=utf-8",
+              cache="no-store"):
         data = body.encode("utf-8") if isinstance(body, str) else body
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         self.end_headers()
         self.wfile.write(data)
 
     def _json(self, obj, code=200):
         self._send(code, json.dumps(obj, ensure_ascii=False))
 
+    def _file(self, target):
+        ext = os.path.splitext(target)[1].lower()
+        ctype = MIME.get(ext, "application/octet-stream")
+        with open(target, "rb") as f:
+            data = f.read()
+        # فایل‌های برنامه را کش مرورگر تازه نگه می‌دارد تا اصلاحات دیده شود
+        self._send(200, data, ctype, cache="no-cache")
+
     def do_GET(self):
-        path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "" :
+        path = urllib.parse.unquote(self.path.split("?", 1)[0]).rstrip("/") or "/"
+
+        if path == "/":
             if os.path.exists(PANEL_HTML):
                 with open(PANEL_HTML, encoding="utf-8") as f:
                     self._send(200, f.read(), "text/html; charset=utf-8")
             else:
                 self._send(404, "panel.html پیدا نشد", "text/plain; charset=utf-8")
-        elif path == "/api/banks":
+            return
+
+        if path == "/api/banks":
             self._json({"banks": find_banks(), "dir": os.path.abspath(DATA_DIR)})
-        elif path == "/api/status":
+            return
+        if path == "/api/status":
             with _lock:
                 self._json({
                     "running": _job["running"],
@@ -174,8 +256,15 @@ class Handler(BaseHTTPRequestHandler):
                     "exitCode": _job["exitCode"],
                     "lines": list(_job["lines"][-120:]),
                 })
-        elif path == "/api/feed":
+            return
+        if path == "/api/feed":
             self._json(feed_summary())
+            return
+
+        # پنل کارشناس + فید خط لوله
+        target = resolve_file(path)
+        if target:
+            self._file(target)
         else:
             self._send(404, "مسیر نامعتبر", "text/plain; charset=utf-8")
 
@@ -241,8 +330,9 @@ def main():
     print("=" * 60)
     print("  پنل خط لوله — انتخاب بانک و اجرای خط لوله")
     print("=" * 60)
-    print(f"  آدرس پنل:    {url}")
-    print(f"  پوشهٔ بانک‌ها: {os.path.abspath(DATA_DIR)}")
+    print(f"  آدرس پنل:        {url}")
+    print(f"  پنل کارشناس:     {url}wpjoo-expert-app/")
+    print(f"  پوشهٔ بانک‌ها:    {os.path.abspath(DATA_DIR)}")
     print("  برای توقف، این پنجره را ببندید.")
     print("=" * 60)
     # باز کردن خودکار مرورگر فقط در حالت تعاملی
